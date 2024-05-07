@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "*.f": "FortranFixedForm",
+        "*.h": "c",
+        "*.c": "c",
+        "typeinfo": "c"
+    }
+}
