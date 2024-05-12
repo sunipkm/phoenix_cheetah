@@ -1,12 +1,12 @@
 #COMPILER OPTIONS
 CC = gcc
 
-INCLUDE_FLAGS = -Iinclude/ -Idrivers/user/libphx/include/
-CFLAGS = -Wall -Wno-unused -O6 -m64 -std=gnu99 -D_PHX_LINUX $(INCLUDE_FLAGS) 
-LFLAGS = -L/usr/local/lib -Ldrivers/user/libphx -lphx -lpfw -lm -lpthread -lrt
+INCLUDE_FLAGS := -Iinclude/ -Idrivers/user/libphx/include/
+CFLAGS := -Wall -Wno-unused -O6 -m64 -std=gnu99 -D_PHX_LINUX $(INCLUDE_FLAGS) $(CFLAGS)
+LDFLAGS := -L/usr/local/lib -Ldrivers/user/libphx -lphx -lpfw -lm -lpthread -lrt $(LDFLAGS)
 
 #DEPENDANCIES
-COMDEP  = Makefile $(wildcard ./src/*.h) drivers/kernel/phxdrv/picc_dio.h
+COMDEP  := Makefile $(wildcard ./include/*.h) drivers/kernel/phxdrv/picc_dio.h
 
 #FILES
 TARGETDIR   = bin
@@ -17,7 +17,7 @@ OBJECT      = $(patsubst %.c,%.o,$(SOURCE))
 
 #WATCHDOG
 $(TARGET): $(OBJECT) $(TARGETDIR)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECT) $(LFLAGS) 
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECT) $(LDFLAGS) 
 
 $(TARGETDIR):
 	mkdir -p $(TARGETDIR)

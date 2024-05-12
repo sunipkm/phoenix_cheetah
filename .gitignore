@@ -3,3 +3,4 @@
 *.ko
 *#*
 .DS_Store
+bin/**

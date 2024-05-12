@@ -96,6 +96,8 @@ typedef enum {
 
     CHEETAH_PARAM(SOFT_RESET_CODE, deadbeef)
 
+    CHEETAH_PARAM(BINNING_1X, 1)
+
     /* Boot Loader */
     CHEETAH_PARAM(CFG_FACTORY, 0)
     CHEETAH_PARAM(CFG_USER1, 1)

@@ -363,11 +363,11 @@ etStat PhxConfig_RunFile(tHandle handle, char *pszConfigFileName)
                                    "[%d, %d, %d, %d, %s, %s])\n",
                                    strParam, roi.x_offset, roi.y_offset,
                                    roi.x_length, roi.y_length,
-                                   roi.x_binning == CHEETAH_BINNING_1X
-                                       ? "CHEETAH_BINNING_1X"
+                                   roi.x_binning == CHEETAHPARAM_BINNING_1X
+                                       ? "CHEETAHPARAM_BINNING_1X"
                                        : "er",
-                                   roi.y_binning == CHEETAH_BINNING_1X
-                                       ? "CHEETAH_BINNING_1X"
+                                   roi.y_binning == CHEETAHPARAM_BINNING_1X
+                                       ? "CHEETAHPARAM_BINNING_1X"
                                        : "er");
 #endif
                             eStat = Phx_Cheetah_Configure(handle, pbParam, &roi);

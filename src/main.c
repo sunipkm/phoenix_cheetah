@@ -106,7 +106,10 @@ int main(int argc, const char *argv[])
 {
 // Unset DIO bit C1
 #if PICC_DIO_ENABLE
+    printf("SHK: Unsetting DIO...\t");
+    fflush(stdout);
     outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
+    printf("Done.\n");
 #endif
     char *configFileName = "config/shk_1bin_2tap_12bit.cfg";
     etStat eStat         = PHX_OK;
@@ -155,7 +158,8 @@ int main(int argc, const char *argv[])
     }
 
     /* Setup our own event context */
-    eStat = PHX_ParameterSet(cheetah_camera, PHX_EVENT_CONTEXT, NULL);
+    int eventContext = 0;
+    eStat = PHX_ParameterSet(cheetah_camera, PHX_EVENT_CONTEXT, (void *)&eventContext);
     if (PHX_OK != eStat)
     {
         printf("SHK: Error PHX_ParameterSet --> PHX_EVENT_CONTEXT\n");
@@ -219,15 +223,16 @@ int main(int argc, const char *argv[])
     expmin &= 0xFF00000;
     expmin = ((ui32)expmin) >> 24;
     expmax &= 0x00FFFFFF;
+    printf("SHK: Min exp = %d | Max exp = %d\n", expmin, expmax);
     expcmd = lround(ONE_MILLION);
-    expcmd = expcmd > expmax ? expmax : expcmd;
+    expcmd = expcmd > expmax ? expmax - 10*expmin : expcmd;
     expcmd = expcmd < expmin ? expmin : expcmd;
-    eStat = Cheetah_ParameterSet(cheetah_camera, CHEETAH_EXP_TIME_ABS, &expcmd);
-    if (PHX_OK != eStat)
-    {
-        printf("SHK: Cheetah_ParameterSet --> CHEETAH_EXP_TIME %d\n", expcmd);
-        shkctrlC(0);
-    }
+    // eStat = Cheetah_ParameterSet(cheetah_camera, CHEETAH_EXP_TIME_ABS, &expcmd);
+    // if (PHX_OK != eStat)
+    // {
+    //     printf("SHK: Cheetah_ParameterSet --> CHEETAH_EXP_TIME %d\n", expcmd);
+    //     shkctrlC(0);
+    // }
     // Get set exposure and frame times
     eStat =
         Cheetah_ParameterGet(cheetah_camera, CHEETAH_INFO_EXP_TIME, &expcmd);
