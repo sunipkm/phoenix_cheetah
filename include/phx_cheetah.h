@@ -80,6 +80,8 @@ typedef enum
 
 } CheetahParam;
 
+#undef CHEETAH_PARAM
+
 #define CHEETAH_PARAM(name, value) \
     CHEETAHPARAM_##name = (ui32)0x##value,
 

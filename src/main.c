@@ -1,10 +1,10 @@
-#define _XOPEN_SOURCE 500
+#define _XOPEN_SOURCE 500 // for sigset
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <math.h>
-#include <pbl_api.h>
 #include <phx_api.h>
+#include <pbl_api.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +12,8 @@
 #include <sys/io.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include <math.h>
 
 /* piccflight headers */
 #include "phx_config.h"
@@ -44,6 +46,11 @@ void shkctrlC(int sig)
         PHX_Destroy(&cheetah_camera); /* Destroy the Phoenix handle */
     }
 
+// Unset DIO bit C1
+#if PICC_DIO_ENABLE
+    outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
+#endif
+
 #if MSG_CTRLC
     printf("SHK: exiting\n");
 #endif
@@ -58,12 +65,23 @@ void shkctrlC(int sig)
 static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
                      void *pvParams)
 {
+    static int state = 0;
     if (dwInterruptMask & PHX_INTRPT_BUFFER_READY)
     {
         stImageBuff stBuffer;
 // Set DIO bit C1
 #if PICC_DIO_ENABLE
-        outb(0x02, PICC_DIO_BASE + PICC_DIO_PORTC);
+        // outb(0x02, PICC_DIO_BASE + PICC_DIO_PORTC);
+        if (state == 0)
+        {
+            outb(0x02, PICC_DIO_BASE + PICC_DIO_PORTC);
+            state = 1;
+        }
+        else
+        {
+            outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
+            state = 0;
+        }
 #endif
 
         etStat eStat =
@@ -73,7 +91,7 @@ static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
             // do stuff with image
 // Unset DIO bit C1
 #if PICC_DIO_ENABLE
-            outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
+            // outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
 #endif
         }
         PHX_StreamRead(cheetah_camera, PHX_BUFFER_RELEASE, NULL);
@@ -86,6 +104,10 @@ static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
 /**************************************************************/
 int main(int argc, const char *argv[])
 {
+// Unset DIO bit C1
+#if PICC_DIO_ENABLE
+    outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
+#endif
     char *configFileName = "config/shk_1bin_2tap_12bit.cfg";
     etStat eStat         = PHX_OK;
     etParamValue eParamValue;
