@@ -377,6 +377,8 @@ int Cheetah_str_to_CheetahParam(char *str, CheetahParam *pbParam)
     return 1;
 }
 
+#undef CHEETAH_TEST
+
 #define CHEETAH_TEST(name)                                                     \
     else if (strcmp(str, "CHEETAHPARAM_" #name) == 0)                          \
     {                                                                          \

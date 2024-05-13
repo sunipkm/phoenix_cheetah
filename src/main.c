@@ -106,6 +106,14 @@ int main(int argc, const char *argv[])
 {
 // Unset DIO bit C1
 #if PICC_DIO_ENABLE
+    printf("SHK: Setting up IO permissions...\t");
+    fflush(stdout);
+    if (ioperm(PICC_DIO_BASE, PICC_DIO_LENGTH, 1))
+    {
+        printf("\n\nFailed to set ioperm: %s\n", strerror(errno));
+        exit(1);
+    }
+    printf("Done.\n");
     printf("SHK: Unsetting DIO...\t");
     fflush(stdout);
     outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);

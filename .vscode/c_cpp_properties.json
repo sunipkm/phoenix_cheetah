@@ -7,7 +7,7 @@
                 "/usr/include/libusb-1.0/**",
                 "${workspaceFolder}/drivers/user/**"
             ],
-            "defines": ["_PHX_LINUX"],
+            "defines": ["_PHX_LINUX", "PICC_DIO_ENABLE"],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c11",
             "cppStandard": "gnu++14",

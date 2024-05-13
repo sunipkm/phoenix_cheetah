@@ -2,7 +2,7 @@
 CC = gcc
 
 INCLUDE_FLAGS := -Iinclude/ -Idrivers/user/libphx/include/
-CFLAGS := -Wall -Wno-unused -O6 -m64 -std=gnu99 -D_PHX_LINUX $(INCLUDE_FLAGS) $(CFLAGS)
+CFLAGS := -Wall -Wno-unused -O6 -m64 -std=gnu99 -D_PHX_LINUX -DPICC_DIO_ENABLE $(INCLUDE_FLAGS) $(CFLAGS)
 LDFLAGS := -L/usr/local/lib -Ldrivers/user/libphx -lphx -lpfw -lm -lpthread -lrt $(LDFLAGS)
 
 #DEPENDANCIES
