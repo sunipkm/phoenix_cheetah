@@ -342,6 +342,10 @@ etStat PhxConfig_RunFile(tHandle handle, char *pszConfigFileName)
             if (fsystem)
             {
                 PhxCheetahParam pbParam;
+                // RESET
+                // ui32 val = CHEETAHPARAM_SOFT_RESET_CODE;
+                // Cheetah_ParameterSet(handle, CHEETAH_SOFT_RESET, &val);
+                // sleep(2);
                 if (Phx_Cheetah_str_to_PhxCheetahParam(strParam, &pbParam) < 0)
                 {
                     eStat = PHX_ERROR_BAD_PARAM;

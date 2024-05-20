@@ -19,3 +19,4 @@ libbmc.a
 libbmp.a
 libhdc.a
 libtnc.a
+data

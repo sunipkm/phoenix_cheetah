@@ -2,9 +2,9 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <math.h>
 #include <phx_api.h>
-#include <pbl_api.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,7 +13,6 @@
 #include <sys/io.h>
 #include <termios.h>
 #include <unistd.h>
-#include <inttypes.h>
 
 #include <math.h>
 
@@ -44,6 +43,7 @@ typedef struct _CamreaContext
 /**************************************************************/
 void shkctrlC(int sig)
 {
+    fflush(stdout);
     if (cheetah_camera)
     {
         PHX_StreamRead(cheetah_camera, PHX_ABORT,
@@ -72,10 +72,18 @@ void shkctrlC(int sig)
 /* SHK_CALLBACK                                               */
 /*  - Exposure ISR callback function                          */
 /**************************************************************/
-static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
-                     void *pvParams)
+static void image_cb(tHandle cam, ui32 dwInterruptMask, void *pvParams)
 {
     static uint64_t frame_count = 0;
+    static char first_frame     = 1;
+    static char first_irq       = 1;
+
+    if (first_irq)
+    {
+        first_irq = 0;
+        printf("SHK: First IRQ\n");
+    }
+
     if (dwInterruptMask & PHX_INTRPT_BUFFER_READY)
     {
         stImageBuff stBuffer;
@@ -94,38 +102,55 @@ static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
         }
 #endif
 
-        etStat eStat =
-            PHX_StreamRead(cheetah_camera, PHX_BUFFER_GET, &stBuffer);
-        if (PHX_OK == eStat)
+        etStat eStat = PHX_StreamRead(cam, PHX_BUFFER_GET, &stBuffer);
+        if (PHX_OK == eStat && first_frame)
         {
             // do stuff with image
             uint16_t wid      = evtCtx->wid;
             uint16_t hei      = evtCtx->hei;
             uint16_t bitshift = evtCtx->bitshift;
-            Bitmap *img       = bm_create(wid, hei);
-            for (int i = 0; i < wid; i++)
+            printf("SHK: First frame: [%u x %u][%u]\n", wid, hei, bitshift);
+            Bitmap *img = bm_create(wid, hei);
+            if (img == NULL)
             {
-                for (int j = 0; j < hei; j++)
-                {
-                    uint8_t val =
-                        ((uint16_t *)stBuffer.pvAddress)[i * wid + j] >>
-                        bitshift;
-                    uint32_t argb = 0xff;
-                    argb <<= 8;
-                    argb |= val;
-                    argb <<= 8;
-                    argb |= val;
-                    argb <<= 8;
-                    argb |= val;
-                    bm_set(img, i, j, val);
-                }
+                printf("SHK: Failed to create image\n");
             }
-            char filename[1024];
-            snprintf(filename, sizeof(filename), "data/image_%s_%" PRIu64 ".png",
-                     evtCtx->name, frame_count);
-            bm_save(img, filename);
+            else
+            {
+                printf("SHK: Created image\n");
+                for (int i = 0; i < wid; i++)
+                {
+                    for (int j = 0; j < hei; j++)
+                    {
+                        uint16_t val;
+                        if (bitshift >= 8)
+                        {
+                            val = ((uint8_t *)stBuffer.pvAddress)[i + j * wid];
+                        }
+                        else
+                        {
+                            val =
+                                ((uint16_t *)stBuffer.pvAddress)[i + j * wid] >>
+                                bitshift;
+                        }
+                        uint32_t argb = 0xff000000;
+                        argb |= (0x000000ff & val);
+                        argb |= (0x000000ff & val) << 8;
+                        argb |= (0x000000ff & val) << 16;
+                        bm_set(img, i, j, argb);
+                    }
+                }
+                printf("SHK: Loaded image\n");
+                char filename[1024];
+                snprintf(filename, sizeof(filename),
+                         "data/image_%s_%" PRIu64 ".bmp", evtCtx->name,
+                         frame_count);
+                int ret = bm_save(img, filename);
+                printf("SHK: Saved image to %s [%d]\n", filename, ret);
+            }
+            first_frame = 0;
         }
-        PHX_StreamRead(cheetah_camera, PHX_BUFFER_RELEASE, NULL);
+        PHX_StreamRead(cam, PHX_BUFFER_RELEASE, NULL);
     }
 }
 
@@ -150,8 +175,17 @@ int main(int argc, const char *argv[])
     outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
     printf("Done.\n");
 #endif
-    char *configFileName = "config/shk_1bin_2tap_12bit.cfg";
-    etStat eStat         = PHX_OK;
+    char *configFileName = "config/shk_1bin_2tap_8bit.cfg";
+    if (argc != 2)
+    {
+        printf("SHK: Using default config file: %s\n", configFileName);
+    }
+    else
+    {
+        configFileName = (char *)argv[1];
+        printf("SHK: Using config file: %s\n", configFileName);
+    }
+    etStat eStat = PHX_OK;
     etParamValue eParamValue;
     CheetahParamValue bParamValue, expmin, expmax, expcmd, frmmin, frmcmd,
         lnmin;
@@ -172,7 +206,7 @@ int main(int argc, const char *argv[])
     }
 
     /* Set the board number */
-    eParamValue = SHK_BOARD_NUMBER;
+    eParamValue = PHX_BOARD_NUMBER_AUTO;
     eStat = PHX_ParameterSet(cheetah_camera, PHX_BOARD_NUMBER, &eParamValue);
     if (PHX_OK != eStat)
     {
@@ -200,11 +234,12 @@ int main(int argc, const char *argv[])
     CameraContext eventContext;
     time_t timer;
     char buffer[26];
-    struct tm* tm_info;
+    struct tm *tm_info;
 
-    timer = time(NULL);
+    timer   = time(NULL);
     tm_info = localtime(&timer);
-    strftime(eventContext.name, sizeof(eventContext.name), "%Y%m%d_%H%M%S", tm_info);
+    strftime(eventContext.name, sizeof(eventContext.name), "%Y%m%d_%H%M%S",
+             tm_info);
 
     eStat = PHX_ParameterSet(cheetah_camera, PHX_EVENT_CONTEXT,
                              (void *)&eventContext);
@@ -259,6 +294,32 @@ int main(int argc, const char *argv[])
         shkctrlC(0);
         break;
     }
+
+    eStat =
+        Cheetah_ParameterGet(cheetah_camera, CHEETAH_MAOI_STATE, &bParamValue);
+    printf("SHK: Camera MAOI state          : %d [%d]\n", bParamValue, eStat);
+    if (bParamValue == 0)
+    {
+        printf("SHK: Setting MAOI state to 1\n");
+        eStat = Cheetah_ParameterSet(cheetah_camera, CHEETAH_MAOI_STATE, 1);
+
+        if (PHX_OK != eStat)
+        {
+            printf("SHK: Cheetah_ParameterSet --> CHEETAH_MAOI_STATE 1\n");
+            fflush(stdout);
+            // shkctrlC(0);
+        }
+        sleep(1);
+        printf("SHK: Checking camera MAOI state...\n");
+        eStat = Cheetah_ParameterGet(cheetah_camera, CHEETAH_MAOI_STATE,
+                                     &bParamValue);
+        printf("SHK: Camera MAOI state          : %d [%d]\n", bParamValue,
+               eStat);
+    }
+
+    eStat =
+        Cheetah_ParameterGet(cheetah_camera, CHEETAH_TRGMODE_EN, &bParamValue);
+    printf("SHK: Camera trigger mode        : %d\n", bParamValue);
 
     /* STOP Capture to put camera in known state */
     eStat = PHX_StreamRead(cheetah_camera, PHX_STOP, (void *)image_cb);
@@ -333,8 +394,9 @@ int main(int argc, const char *argv[])
         printf("SHK: Camera started\n");
     }
 
-    sleep(10); // run for 10 seconds
+    sleep(4); // run for 10 seconds
 
+    printf("SHK: Exiting\n");
     /* Exit */
     shkctrlC(0);
     return 0;
