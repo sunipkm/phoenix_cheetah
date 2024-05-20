@@ -6,14 +6,18 @@
 #include <phx_api.h>
 #include <pbl_api.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/io.h>
 #include <termios.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <math.h>
+
+#include <libbmp/libbmp.h>
 
 /* piccflight headers */
 #include "phx_config.h"
@@ -26,7 +30,13 @@
 
 /* Global Variables */
 tHandle cheetah_camera = 0; /* Camera Handle   */
-float CHEETAH_GetTemp(tHandle hCamera);
+typedef struct _CamreaContext
+{
+    uint16_t wid;
+    uint16_t hei;
+    uint16_t bitshift;
+    char name[64];
+} CameraContext;
 
 /**************************************************************/
 /* SHKCTRLC                                                   */
@@ -65,22 +75,22 @@ void shkctrlC(int sig)
 static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
                      void *pvParams)
 {
-    static int state = 0;
+    static uint64_t frame_count = 0;
     if (dwInterruptMask & PHX_INTRPT_BUFFER_READY)
     {
         stImageBuff stBuffer;
+        CameraContext *evtCtx = (CameraContext *)pvParams;
+        frame_count++;
 // Set DIO bit C1
 #if PICC_DIO_ENABLE
         // outb(0x02, PICC_DIO_BASE + PICC_DIO_PORTC);
-        if (state == 0)
+        if (frame_count % 2 == 0)
         {
             outb(0x02, PICC_DIO_BASE + PICC_DIO_PORTC);
-            state = 1;
         }
         else
         {
             outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
-            state = 0;
         }
 #endif
 
@@ -89,10 +99,31 @@ static void image_cb(tHandle cheetah_camera, ui32 dwInterruptMask,
         if (PHX_OK == eStat)
         {
             // do stuff with image
-// Unset DIO bit C1
-#if PICC_DIO_ENABLE
-            // outb(0x00, PICC_DIO_BASE + PICC_DIO_PORTC);
-#endif
+            uint16_t wid      = evtCtx->wid;
+            uint16_t hei      = evtCtx->hei;
+            uint16_t bitshift = evtCtx->bitshift;
+            Bitmap *img       = bm_create(wid, hei);
+            for (int i = 0; i < wid; i++)
+            {
+                for (int j = 0; j < hei; j++)
+                {
+                    uint8_t val =
+                        ((uint16_t *)stBuffer.pvAddress)[i * wid + j] >>
+                        bitshift;
+                    uint32_t argb = 0xff;
+                    argb <<= 8;
+                    argb |= val;
+                    argb <<= 8;
+                    argb |= val;
+                    argb <<= 8;
+                    argb |= val;
+                    bm_set(img, i, j, val);
+                }
+            }
+            char filename[1024];
+            snprintf(filename, sizeof(filename), "data/image_%s_%" PRIu64 ".png",
+                     evtCtx->name, frame_count);
+            bm_save(img, filename);
         }
         PHX_StreamRead(cheetah_camera, PHX_BUFFER_RELEASE, NULL);
     }
@@ -166,8 +197,17 @@ int main(int argc, const char *argv[])
     }
 
     /* Setup our own event context */
-    int eventContext = 0;
-    eStat = PHX_ParameterSet(cheetah_camera, PHX_EVENT_CONTEXT, (void *)&eventContext);
+    CameraContext eventContext;
+    time_t timer;
+    char buffer[26];
+    struct tm* tm_info;
+
+    timer = time(NULL);
+    tm_info = localtime(&timer);
+    strftime(eventContext.name, sizeof(eventContext.name), "%Y%m%d_%H%M%S", tm_info);
+
+    eStat = PHX_ParameterSet(cheetah_camera, PHX_EVENT_CONTEXT,
+                             (void *)&eventContext);
     if (PHX_OK != eStat)
     {
         printf("SHK: Error PHX_ParameterSet --> PHX_EVENT_CONTEXT\n");
@@ -195,6 +235,30 @@ int main(int argc, const char *argv[])
                                  &bParamValue);
     printf("SHK: Camera current size        : [%d x %d]\n",
            (bParamValue & 0x0000FFFF), (bParamValue & 0xFFFF0000) >> 16);
+    eventContext.hei = (bParamValue & 0xFFFF0000) >> 16;
+    eventContext.wid = (bParamValue & 0x0000FFFF);
+
+    eStat =
+        Cheetah_ParameterGet(cheetah_camera, CHEETAH_A2D_BITS, &bParamValue);
+    switch (bParamValue)
+    {
+    case CHEETAHPARAM_A2D_8B:
+        printf("SHK: Camera A2D bits            : 8\n");
+        eventContext.bitshift = 8;
+        break;
+    case CHEETAHPARAM_A2D_10B:
+        printf("SHK: Camera A2D bits            : 10\n");
+        eventContext.bitshift = 6;
+        break;
+    case CHEETAHPARAM_A2D_12B:
+        printf("SHK: Camera A2D bits            : 12\n");
+        eventContext.bitshift = 4;
+        break;
+    default:
+        printf("SHK: Camera A2D bits            : Unknown [%d]\n", bParamValue);
+        shkctrlC(0);
+        break;
+    }
 
     /* STOP Capture to put camera in known state */
     eStat = PHX_StreamRead(cheetah_camera, PHX_STOP, (void *)image_cb);
@@ -233,13 +297,13 @@ int main(int argc, const char *argv[])
     expmax &= 0x00FFFFFF;
     printf("SHK: Min exp = %d | Max exp = %d\n", expmin, expmax);
     expcmd = lround(ONE_MILLION);
-    expcmd = expcmd > expmax ? expmax - 10*expmin : expcmd;
+    expcmd = expcmd > expmax ? expmax - 10 * expmin : expcmd;
     expcmd = expcmd < expmin ? expmin : expcmd;
-    // eStat = Cheetah_ParameterSet(cheetah_camera, CHEETAH_EXP_TIME_ABS, &expcmd);
-    // if (PHX_OK != eStat)
+    // eStat = Cheetah_ParameterSet(cheetah_camera, CHEETAH_EXP_TIME_ABS,
+    // &expcmd); if (PHX_OK != eStat)
     // {
-    //     printf("SHK: Cheetah_ParameterSet --> CHEETAH_EXP_TIME %d\n", expcmd);
-    //     shkctrlC(0);
+    //     printf("SHK: Cheetah_ParameterSet --> CHEETAH_EXP_TIME %d\n",
+    //     expcmd); shkctrlC(0);
     // }
     // Get set exposure and frame times
     eStat =
