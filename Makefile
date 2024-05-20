@@ -14,18 +14,20 @@ TARGET      = $(TARGETDIR)/watchdog
 SOURCE      = $(wildcard ./src/*.c)
 OBJECT      = $(patsubst %.c,%.o,$(SOURCE))
 LIBBMP      = libraries/libbmp/libbmp.a
-
+DATADIR     = data
 
 #WATCHDOG
-$(TARGET): $(OBJECT) $(TARGETDIR) $(LIBBMP)
+$(TARGET): $(OBJECT) $(TARGETDIR) $(DATADIR) $(LIBBMP)
 	$(CC) $(CFLAGS) -o $(TARGET) $(OBJECT) $(LIBBMP) $(LDFLAGS) 
 
 $(TARGETDIR):
 	mkdir -p $(TARGETDIR)
 
+$(DATADIR):
+	mkdir -p $(DATADIR)
+
 $(LIBBMP):
 	cd libraries/libbmp && make && cd ../..
-
 
 #USERSPACE OBJECTS
 %.o: %.c  $(COMDEP)
@@ -44,6 +46,7 @@ clean:
 
 spotless: clean
 	rm -f $(TARGETDIR)/*
+	rm -f $(DATADIR)/*
 	cd libraries/libbmp && make clean && cd ../..
 
 #REMOVE *~ files
