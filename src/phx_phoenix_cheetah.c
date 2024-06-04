@@ -166,11 +166,58 @@ etStat Phx_Cheetah_Configure(tHandle hpb, PhxCheetahParam parameter,
             break;
 
         case PHX_CHEETAH_DOUBLE_TAP:
-            eParamValue = 2;
+            eParamValue = 1;
             eStat       = PHX_ParameterSet(hpb, PHX_CAM_HTAP_NUM,
                                            (etParamValue *)&(eParamValue));
             if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting number of horizontal taps\n");
                 goto Error;
+            }
+            eParamValue = 2;
+            eStat       = PHX_ParameterSet(hpb, PHX_CAM_VTAP_NUM,
+                                           (etParamValue *)&(eParamValue));
+            if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting number of vertical taps\n");
+                goto Error;
+            }
+            eParamValue = PHX_CAM_HTAP_LEFT;
+            eStat       = PHX_ParameterSet(hpb, PHX_CAM_HTAP_DIR,
+                                           (etParamValue *)&(eParamValue));
+            if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting htap direction\n");
+                goto Error;
+            }
+            eParamValue = PHX_CAM_HTAP_LINEAR;
+            eStat = PHX_ParameterSet(hpb, PHX_CAM_HTAP_TYPE, &eParamValue);
+            if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting htap type\n");
+                goto Error;
+            }
+            eParamValue = PHX_CAM_HTAP_ASCENDING;
+            eStat = PHX_ParameterSet(hpb, PHX_CAM_HTAP_ORDER, &eParamValue);
+            if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting htap order\n");
+                goto Error;
+            }
+            eParamValue = PHX_CAM_VTAP_TOP;
+            eStat       = PHX_ParameterSet(hpb, PHX_CAM_VTAP_DIR, &eParamValue);
+            if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting vtap direction\n");
+                goto Error;
+            }
+            eParamValue = PHX_CAM_VTAP_OFFSET;
+            eStat = PHX_ParameterSet(hpb, PHX_CAM_VTAP_TYPE, &eParamValue);
+            if (eStat != PHX_OK)
+            {
+                printf("PHX: Error setting vtap type\n");
+                goto Error;
+            }
             bParamValue = CHEETAHPARAM_TAPS_BASE2;
             eStat       = Cheetah_ParameterSet(hpb, CHEETAH_TAPS,
                                                (CheetahParamValue *)&bParamValue);

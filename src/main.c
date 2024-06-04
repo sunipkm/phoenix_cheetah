@@ -34,6 +34,7 @@ typedef struct _CamreaContext
     uint16_t wid;
     uint16_t hei;
     uint16_t bitshift;
+    uint64_t frames;
     char name[64];
 } CameraContext;
 
@@ -89,6 +90,7 @@ static void image_cb(tHandle cam, ui32 dwInterruptMask, void *pvParams)
         stImageBuff stBuffer;
         CameraContext *evtCtx = (CameraContext *)pvParams;
         frame_count++;
+        evtCtx->frames = frame_count;
 // Set DIO bit C1
 #if PICC_DIO_ENABLE
         // outb(0x02, PICC_DIO_BASE + PICC_DIO_PORTC);
@@ -169,6 +171,14 @@ int main(int argc, const char *argv[])
         printf("\n\nFailed to set ioperm: %s\n", strerror(errno));
         exit(1);
     }
+    printf("Done.\n");
+    printf("SHK: Selecting DIO page...\t");
+    fflush(stdout);
+    outb(0x1, PICC_DIO_BASE + PICC_DIO_PAGE);
+    printf("Done.\n");
+    printf("SHK: Enabling DIO...\t");
+    fflush(stdout);
+    outb(0x80, PICC_DIO_BASE + PICC_DIO_CTRL);
     printf("Done.\n");
     printf("SHK: Unsetting DIO...\t");
     fflush(stdout);
@@ -396,7 +406,7 @@ int main(int argc, const char *argv[])
 
     sleep(4); // run for 10 seconds
 
-    printf("SHK: Exiting\n");
+    printf("SHK: Exiting. Total frames: %" PRIu64 "\n", eventContext.frames);
     /* Exit */
     shkctrlC(0);
     return 0;
